@@ -73,6 +73,40 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const config=window.APNA_CONFIG||{};const gate=document.getElementById('authGate'),error=document.getElementById('authError'),tools=document.getElementById('accountTools');
 if(!config.supabaseUrl||!config.supabaseAnonKey){error.textContent='Supabase not connected yet. Check config.js.';}else{
  document.getElementById('authSetup').hidden=true;const supabase=createClient(config.supabaseUrl,config.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true}});let currentProfile=null;
+
+ // Supports both the original per-record schema and the later per-user JSON schema.
+ let storageMode=null, snapshotId=null, activeOwner=null;
+ function normalizeClinicData(value){
+   const empty={patients:[],visits:[],payments:[],stock:[],expenseCategories:[],expenses:[]};
+   if(!value||typeof value!=='object'||Array.isArray(value))return empty;
+   for(const key of Object.keys(empty))empty[key]=Array.isArray(value[key])?value[key]:[];
+   return empty;
+ }
+ async function loadClinicData(ownerId){
+   activeOwner=ownerId;window.clinicRemoteSave=null;error.textContent='Loading clinic records…';
+   try{
+     const one=await supabase.from('clinic_records').select('owner_id,data').eq('owner_id',ownerId).maybeSingle();
+     if(!one.error){storageMode='single';db=normalizeClinicData(one.data?.data);render();window.clinicRemoteSave=saveClinicData;error.textContent='';return true;}
+     const many=await supabase.from('clinic_records').select('id,record_type,record_data').eq('owner_id',ownerId).eq('record_type','patient').order('created_at',{ascending:false}).limit(1);
+     if(many.error)throw many.error;
+     storageMode='records';snapshotId=many.data?.[0]?.id||null;
+     db=normalizeClinicData(many.data?.[0]?.record_data);render();window.clinicRemoteSave=saveClinicData;error.textContent='';return true;
+   }catch(err){error.textContent='Cloud data load failed: '+(err.message||String(err));return false;}
+ }
+ async function saveClinicData(value){
+   if(!activeOwner||!storageMode){alert('Cloud storage not connected');return false;}
+   let result;
+   if(storageMode==='single'){
+     result=await supabase.from('clinic_records').upsert({owner_id:activeOwner,data:value,updated_at:new Date().toISOString()},{onConflict:'owner_id'});
+   }else if(snapshotId){
+     result=await supabase.from('clinic_records').update({record_data:value,updated_at:new Date().toISOString()}).eq('id',snapshotId).eq('owner_id',activeOwner).select('id').single();
+   }else{
+     result=await supabase.from('clinic_records').insert({owner_id:activeOwner,record_type:'patient',record_data:value}).select('id').single();
+     if(!result.error)snapshotId=result.data.id;
+   }
+   if(result.error){alert('Cloud save failed: '+result.error.message);return false;}
+   return true;
+ }
  async function verify(){const {data:{user}}=await supabase.auth.getUser();if(!user){window.clinicRemoteSave=null;gate.hidden=false;tools.style.display='none';return}const {data:p,error:e}=await supabase.from('profiles').select('id,email,role,status').eq('id',user.id).single();if(e||!p||p.status!=='active'){await supabase.auth.signOut();gate.hidden=false;tools.style.display='none';error.textContent='Account not active or not configured.';return}currentProfile=p;const loaded=await loadClinicData(user.id);if(!loaded){gate.hidden=false;tools.style.display='none';return}gate.hidden=true;tools.style.display='flex';document.getElementById('whoami').textContent='Apna Clinic';document.getElementById('manageAccounts').hidden=p.role!=='super_admin';}
  document.getElementById('authForm').addEventListener('submit',async e=>{e.preventDefault();error.textContent='Signing in…';const {error:e2}=await supabase.auth.signInWithPassword({email:document.getElementById('authEmail').value.trim(),password:document.getElementById('authPassword').value});if(e2){error.textContent=e2.message;return}error.textContent='';await verify()});
  document.getElementById('logoutBtn').onclick=async()=>{await supabase.auth.signOut();location.reload()};supabase.auth.onAuthStateChange((_event,session)=>{if(!session){window.clinicRemoteSave=null;gate.hidden=false;tools.style.display='none'}});
