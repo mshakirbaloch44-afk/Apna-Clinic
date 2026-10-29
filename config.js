@@ -1,7 +1,7 @@
 
 window.APNA_CONFIG = {
-  supabaseUrl: "YOUR_SUPABASE_PROJECT_URL",
-  supabaseAnonKey: "YOUR_SUPABASE_PUBLISHABLE_KEY"
+  supabaseUrl: "https://xspryeownfhsgreeuruf.supabase.co",
+  supabaseAnonKey: "sb_publishable_EaRlOi2lAI_uN-sxBQ9lWw_YAr9k3TS"
 };
 
 window.APNA_CLINIC_CONFIG = {
