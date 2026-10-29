@@ -1,0 +1,1 @@
+Upload extracted files to GitHub repository root. Replace index.html. Do not upload ZIP itself. This fixes malformed JavaScript and duplicate auth clients. Patient records remain browser local and are NOT safe for real use.
