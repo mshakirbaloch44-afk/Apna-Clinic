@@ -194,6 +194,6 @@ if(!config.supabaseUrl||!config.supabaseAnonKey){error.textContent='Supabase not
  async function refreshUsers(){const {data,error:e}=await supabase.from('profiles').select('id,email,role,status').order('email');document.getElementById('userList').innerHTML=e?'Could not load users: '+e.message:(data||[]).map(u=>'<div style="padding:9px;border-bottom:1px solid #ddd">'+escapeHtml(u.email)+' — '+escapeHtml(u.role)+' — '+escapeHtml(u.status)+(u.id===currentProfile.id?'': ' <button data-user="'+u.id+'" data-status="'+(u.status==='active'?'suspended':'active')+'">'+(u.status==='active'?'Suspend':'Activate')+'</button>')+'</div>').join('');document.querySelectorAll('[data-user]').forEach(b=>b.onclick=async()=>{const {error:e}=await supabase.from('profiles').update({status:b.dataset.status}).eq('id',b.dataset.user);document.getElementById('adminMessage').textContent=e?e.message:'Account updated';await refreshUsers()})}
  function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
  document.getElementById('inviteForm').onsubmit=async e=>{e.preventDefault();document.getElementById('adminMessage').textContent='Invitations require a server-side Edge Function. Never put a service-role key in GitHub Pages.'};
- try{await verify()}catch(e){error.textContent='Login setup error: '+e.message;gate.hidden=false}
+ verify().catch(e=>{error.textContent='Login setup error: '+e.message;gate.hidden=false})
 }
 </script></body></html>
